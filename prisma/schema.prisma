@@ -1,0 +1,151 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TransactionType {
+  LOAN
+  RETURN
+}
+
+enum TransactionStatus {
+  ACTIVE
+  COMPLETED
+  OVERDUE
+}
+
+// === NextAuth core models ===
+
+model User {
+  id              String          @id @default(cuid())
+  name            String?
+  email           String          @unique
+  emailVerified   DateTime?
+  image           String?
+  password        String?
+
+  // Custom fields
+  role            UserRole        @default(USER)
+  status          UserStatus      @default(PENDING)
+  deleted         Boolean         @default(false)
+  enabled         Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // NextAuth relations
+  accounts        Account[]
+  sessions        Session[]
+
+  // Domain-specific relations
+  createdBooks    Book[]          @relation("CreatedBooks")
+  transactions    Transaction[]   @relation("UserTransactions")
+  actions         Transaction[]   @relation("LibrarianTransactions")
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @default(now())
+
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// === Domain-specific models ===
+
+model Book {
+  id              String     @id @default(uuid())
+  title           String
+  author          String
+  isbn            String?    @unique
+  genre           String?
+  publicationYear Int?
+  totalCopies     Int        @default(1)
+  availableCopies Int        @default(1)
+  description     String?
+  coverImageUrl   String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  createdBy       User       @relation("CreatedBooks", fields: [createdById], references: [id])
+  createdById     String
+
+  transactions    Transaction[]
+}
+
+model Transaction {
+  id           String            @id @default(uuid())
+
+  book         Book              @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  bookId       String
+
+  user         User              @relation("UserTransactions", fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+
+  librarian    User?             @relation("LibrarianTransactions", fields: [librarianId], references: [id])
+  librarianId  String?
+
+  type         TransactionType
+  status       TransactionStatus @default(ACTIVE)
+
+  loanDate     DateTime          @default(now())
+  dueDate      DateTime?
+  returnDate   DateTime?
+  notes        String?
+
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
