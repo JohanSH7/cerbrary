@@ -5,7 +5,7 @@ import { signOut } from "next-auth/react";
 export const LogoutButton = () => {
   return (
     <Button
-      variant="outline"
+      className="bg-[#D5C2A5] hover:bg-[#c3b092] text-black"
       onClick={() => signOut({ callbackUrl: "/" })}
     >
       Cerrar sesión
