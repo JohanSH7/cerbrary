@@ -263,23 +263,37 @@ export const filterBooksByYearAndAuthor = async (year: number, author: string) =
 };
 
 // =================== TRANSACCIONES ===================
-export const createTransaction = async (bookId: string) => {
-    return makeJsonPost('/api/transaction', { bookId }, 'POST');
+export const createTransaction = async (bookId: string, userId: string) => {
+    return makeJsonPost('/api/transaction', { bookId, userId }, 'POST');
 };
 
-export const getUserTransactions = async () => {
-    try {
-        const response = await fetch('/api/transaction', { method: 'GET' });
-        if (!response.ok) {
-            throw new Error(`Error fetching transactions: ${response.statusText}`);
-        }
-        return response.json();
-    } catch (error) {
-        console.error("Error fetching transactions:", error);
-        throw error;
+export const getUserTransactions = async (userId?: string) => {
+  try {
+    const url = userId ? `/api/transaction?userId=${userId}` : '/api/transaction';
+    const response = await fetch(url, { method: 'GET' });
+
+    if (!response.ok) {
+      throw new Error(`Error fetching transactions: ${response.statusText}`);
     }
+
+    return response.json();
+  } catch (error) {
+    console.error("Error fetching transactions:", error);
+    throw error;
+  }
 };
+
 
 export const updateTransaction = async (transactionId: string, status: string, returnDate?: string) => {
-    return makeJsonPost('/api/transaction', { transactionId, status, returnDate }, 'PUT');
+    const response = await fetch('/api/transaction', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionId, status, returnDate }),
+    });
+
+    if (!response.ok) {
+        throw new Error('Error al actualizar la transacción');
+    }
+
+    return response.json();
 };

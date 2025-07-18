@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getUserTransactions } from '@/utils/api';
-import TransactionDataTable from '@/components/organism/DataTable/index';
+import TransactionDataTable from '@/components/organism/transactionsTable/index';
 
 const Index = () => {
     const [transactions, setTransactions] = useState([]);
@@ -17,7 +17,7 @@ const Index = () => {
 
     return (
         <div>
-            <TransactionDataTable users={transactions} />
+            <TransactionDataTable transactions={transactions} />
         </div>
     );
 };

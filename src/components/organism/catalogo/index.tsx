@@ -103,52 +103,54 @@ const Catalogo = ({ initialBooks = [] }: CatalogoProps) => {
     };
 
     const handleLoanBook = async (bookId: string) => {
-        if (!session) {
-            setError("Debes iniciar sesión para pedir un préstamo");
-            return;
+    if (!session) {
+        setError("Debes iniciar sesión para pedir un préstamo");
+        return;
+    }
+
+    setLoanLoading(true);
+    setError(null);
+
+    try {
+        const userId = session.user.id; // Asegúrate de que el ID del usuario esté disponible en la sesión
+        console.log("Attempting to create loan for book:", bookId, "by user:", userId);
+        
+        const result = await createTransaction(bookId, userId);
+        console.log("Loan created successfully:", result);
+        
+        // Actualizar el libro en el estado local
+        setBooks(prevBooks => 
+            prevBooks.map(book => 
+                book.id === bookId 
+                    ? { ...book, availableCopies: book.availableCopies - 1 }
+                    : book
+            )
+        );
+
+        // Actualizar el libro seleccionado si es el mismo
+        if (selectedBook?.id === bookId) {
+            setSelectedBook(prev => prev ? { ...prev, availableCopies: prev.availableCopies - 1 } : null);
         }
 
-        setLoanLoading(true);
-        setError(null);
-
-        try {
-            console.log("Attempting to create loan for book:", bookId);
-            const result = await createTransaction(bookId);
-            console.log("Loan created successfully:", result);
-            
-            // Actualizar el libro en el estado local
-            setBooks(prevBooks => 
-                prevBooks.map(book => 
-                    book.id === bookId 
-                        ? { ...book, availableCopies: book.availableCopies - 1 }
-                        : book
-                )
-            );
-
-            // Actualizar el libro seleccionado si es el mismo
-            if (selectedBook?.id === bookId) {
-                setSelectedBook(prev => prev ? { ...prev, availableCopies: prev.availableCopies - 1 } : null);
-            }
-
-            // Mostrar mensaje de éxito
-            alert("¡Préstamo solicitado exitosamente! El libro ha sido reservado para ti.");
-            
-        } catch (error: unknown) {
-            console.error("Error creating loan:", error);
-            let errorMessage = "Error al procesar el préstamo";
-            
-            if (error instanceof Error) {
-                errorMessage = error.message;
-            } else if (typeof error === 'string') {
-                errorMessage = error;
-            }
-            
-            setError(errorMessage);
-            alert(`Error: ${errorMessage}`);
-        } finally {
-            setLoanLoading(false);
+        // Mostrar mensaje de éxito
+        alert("¡Préstamo solicitado exitosamente! El libro ha sido reservado para ti.");
+        
+    } catch (error: unknown) {
+        console.error("Error creating loan:", error);
+        let errorMessage = "Error al procesar el préstamo";
+        
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        } else if (typeof error === 'string') {
+            errorMessage = error;
         }
-    };
+        
+        setError(errorMessage);
+        alert(`Error: ${errorMessage}`);
+    } finally {
+        setLoanLoading(false);
+    }
+};
 
     return (
         <section className="container px-4 mx-auto">

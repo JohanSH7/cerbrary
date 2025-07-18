@@ -4,17 +4,34 @@ import { db } from "../../../lib/db";
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   switch (req.method) {
     case 'GET':
-      try {
-        const transactions = await db.transaction.findMany({
-          include: { book: true, user: true },
-          orderBy: { createdAt: 'desc' },
-        });
-        res.status(200).json(transactions);
-      } catch (error) {
-        console.error("Error fetching transactions:", error);
-        res.status(500).json({ error: "Error interno del servidor" });
-      }
-      break;
+  try {
+    const { userId } = req.query;
+
+    const transactions = await db.transaction.findMany({
+      where: userId ? { userId: userId as string } : undefined,
+      include: {
+        book: true,
+        user: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formattedTransactions = transactions.map(transaction => ({
+      id: transaction.id,
+      bookTitle: transaction.book.title,
+      userName: transaction.user.name,
+      status: transaction.status,
+      createdAt: transaction.loanDate,
+      returnDate: transaction.returnDate,
+    }));
+
+    res.status(200).json(formattedTransactions);
+  } catch (error) {
+    console.error("Error fetching transactions:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+  break;
+
 
     case 'POST':
       try {
@@ -49,15 +66,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     case 'PUT':
       try {
         const { transactionId, status } = req.body;
+
+        // Validar que los datos necesarios estén presentes
         if (!transactionId || !status) {
           return res.status(400).json({ error: "transactionId y status son requeridos" });
         }
 
+        // Actualizar la transacción con el nuevo estado
         const updatedTransaction = await db.transaction.update({
           where: { id: transactionId },
-          data: { status },
+          data: {
+            status,
+            returnDate: status === 'COMPLETED' ? new Date() : null, // Registrar la fecha de devolución si es COMPLETED
+          },
+          include: {
+            book: true, // Incluye el libro para obtener el bookId
+          },
         });
 
+        // Si el estado es "COMPLETED", incrementar las copias disponibles del libro
         if (status === 'COMPLETED') {
           await db.book.update({
             where: { id: updatedTransaction.bookId },
