@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { createBook } from "@/utils/api"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
@@ -29,6 +29,8 @@ const BookAdminTable = ({ books }: BookTableProps) => {
   const [bookList, setBookList] = useState<Book[]>(books)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [imageUploading, setImageUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Estados para formulario de agregar libro
   const [form, setForm] = useState({
@@ -42,12 +44,72 @@ const BookAdminTable = ({ books }: BookTableProps) => {
     coverImageUrl: "",
   })
 
+  // Estado para preview de imagen
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+
   useEffect(() => {
     setBookList(books)
   }, [books])
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
+  }
+
+  // Función para manejar la selección de archivo
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validar tipo de archivo
+      if (!file.type.startsWith('image/')) {
+        setError('Por favor selecciona un archivo de imagen válido.')
+        return
+      }
+
+      // Validar tamaño (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('La imagen debe ser menor a 5MB.')
+        return
+      }
+
+      setSelectedFile(file)
+      setError(null)
+
+      // Crear preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  // Función para subir imagen
+  const uploadImage = async (file: File): Promise<string> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      throw new Error('Error al subir la imagen')
+    }
+
+    const data = await response.json()
+    return data.url
+  }
+
+  // Función para limpiar selección de imagen
+  const clearImageSelection = () => {
+    setSelectedFile(null)
+    setImagePreview(null)
+    setForm({ ...form, coverImageUrl: "" })
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
   }
 
   const handleAddBook = async (e: React.FormEvent) => {
@@ -57,8 +119,18 @@ const BookAdminTable = ({ books }: BookTableProps) => {
       setError("Solo administradores pueden agregar libros.")
       return
     }
+    
     setLoading(true)
+    setImageUploading(true)
+    
     try {
+      let finalCoverImageUrl = form.coverImageUrl
+
+      // Si hay un archivo seleccionado, subirlo primero
+      if (selectedFile) {
+        finalCoverImageUrl = await uploadImage(selectedFile)
+      }
+
       const newBook = await createBook({
         createdById: session.user.id,
         title: form.title,
@@ -69,8 +141,9 @@ const BookAdminTable = ({ books }: BookTableProps) => {
         availableCopies: form.availableCopies ? Number(form.availableCopies) : 0,
         isbn: form.isbn,
         description: form.description,
-        coverImageUrl: form.coverImageUrl,
+        coverImageUrl: finalCoverImageUrl,
       })
+      
       setBookList((prev) => [...prev, newBook])
       setForm({
         title: "",
@@ -82,10 +155,13 @@ const BookAdminTable = ({ books }: BookTableProps) => {
         description: "",
         coverImageUrl: "",
       })
+      clearImageSelection()
     } catch (err: unknown) {
+      console.error('Error al agregar libro:', err)
       setError("Error al agregar el libro")
     } finally {
       setLoading(false)
+      setImageUploading(false)
     }
   }
 
@@ -150,102 +226,177 @@ const BookAdminTable = ({ books }: BookTableProps) => {
         {session?.user?.role === "ADMIN" ? (
           <div className="bg-gradient-to-br from-[#fffaf0] to-[#F3EEE7] border border-[#EADBC8] rounded-2xl shadow-lg p-6">
             <h3 className="text-xl font-bold text-[#4B3C2A] mb-4">Agregar nuevo libro</h3>
-            <form onSubmit={handleAddBook} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <form onSubmit={handleAddBook} className="space-y-6">
+              {/* Campos básicos */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">Título</label>
+                  <input
+                    name="title"
+                    value={form.title}
+                    onChange={handleFormChange}
+                    placeholder="Título del libro"
+                    required
+                    className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">Autor</label>
+                  <input
+                    name="author"
+                    value={form.author}
+                    onChange={handleFormChange}
+                    placeholder="Nombre del autor"
+                    required
+                    className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">Género</label>
+                  <input
+                    name="genre"
+                    value={form.genre}
+                    onChange={handleFormChange}
+                    placeholder="Género literario"
+                    required
+                    className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">Año de publicación</label>
+                  <input
+                    name="publicationYear"
+                    value={form.publicationYear}
+                    onChange={handleFormChange}
+                    placeholder="2024"
+                    type="number"
+                    required
+                    className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">Copias disponibles</label>
+                  <input
+                    name="availableCopies"
+                    value={form.availableCopies}
+                    onChange={handleFormChange}
+                    placeholder="5"
+                    type="number"
+                    required
+                    className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">ISBN</label>
+                  <input
+                    name="isbn"
+                    value={form.isbn}
+                    onChange={handleFormChange}
+                    placeholder="978-0000000000"
+                    className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58]"
+                  />
+                </div>
+              </div>
+
+              {/* Sección de imagen */}
+              <div className="border border-[#EADBC8] rounded-xl p-6 bg-gradient-to-br from-[#F3EEE7] to-[#EADBC8]">
+                <h4 className="text-lg font-semibold text-[#4B3C2A] mb-4">Portada del libro</h4>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Opción 1: Subir archivo */}
+                  <div>
+                    <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">Subir imagen</label>
+                    <div className="space-y-4">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#B89F84] file:text-[#F3EEE7] hover:file:bg-[#8C735B]"
+                      />
+                      <p className="text-xs text-[#7A6A58]">
+                        Formatos soportados: JPG, PNG, GIF. Tamaño máximo: 5MB
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Opción 2: URL de imagen */}
+                  <div>
+                    <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">O URL de imagen</label>
+                    <input
+                      name="coverImageUrl"
+                      value={form.coverImageUrl}
+                      onChange={handleFormChange}
+                      placeholder="https://ejemplo.com/portada.jpg"
+                      disabled={!!selectedFile}
+                      className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58] disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                    {selectedFile && (
+                      <p className="text-xs text-[#7A6A58] mt-2">
+                        Campo deshabilitado porque hay un archivo seleccionado
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Preview de imagen */}
+                {(imagePreview || form.coverImageUrl) && (
+                  <div className="mt-6">
+                    <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">Vista previa</label>
+                    <div className="flex items-start gap-4">
+                      <div className="relative">
+                        <img
+                          src={imagePreview || form.coverImageUrl}
+                          alt="Preview"
+                          className="w-32 h-40 object-cover rounded-lg shadow-md border border-[#EADBC8]"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={clearImageSelection}
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm text-[#4B3C2A] font-medium mb-1">
+                          {selectedFile ? selectedFile.name : 'Imagen desde URL'}
+                        </p>
+                        {selectedFile && (
+                          <p className="text-xs text-[#7A6A58]">
+                            Tamaño: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Descripción */}
               <div>
-                <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">Título</label>
-                <input
-                  name="title"
-                  value={form.title}
-                  onChange={handleFormChange}
-                  placeholder="Título del libro"
-                  required
-                  className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">Autor</label>
-                <input
-                  name="author"
-                  value={form.author}
-                  onChange={handleFormChange}
-                  placeholder="Nombre del autor"
-                  required
-                  className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">Género</label>
-                <input
-                  name="genre"
-                  value={form.genre}
-                  onChange={handleFormChange}
-                  placeholder="Género literario"
-                  required
-                  className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">Año de publicación</label>
-                <input
-                  name="publicationYear"
-                  value={form.publicationYear}
-                  onChange={handleFormChange}
-                  placeholder="2024"
-                  type="number"
-                  required
-                  className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">Copias disponibles</label>
-                <input
-                  name="availableCopies"
-                  value={form.availableCopies}
-                  onChange={handleFormChange}
-                  placeholder="5"
-                  type="number"
-                  required
-                  className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">ISBN</label>
-                <input
-                  name="isbn"
-                  value={form.isbn}
-                  onChange={handleFormChange}
-                  placeholder="978-0000000000"
-                  className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58]"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">URL de portada</label>
-                <input
-                  name="coverImageUrl"
-                  value={form.coverImageUrl}
-                  onChange={handleFormChange}
-                  placeholder="https://ejemplo.com/portada.jpg"
-                  className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58]"
-                />
-              </div>
-              <div className="md:col-span-3">
                 <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">Descripción</label>
                 <textarea
                   name="description"
                   value={form.description}
                   onChange={handleFormChange}
                   placeholder="Descripción del libro..."
-                  rows={3}
+                  rows={4}
                   className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] placeholder-[#7A6A58] resize-none"
                 />
               </div>
-              <div className="md:col-span-3 flex justify-end">
+
+              {/* Botón de envío */}
+              <div className="flex justify-end">
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="px-8 py-3 text-sm font-semibold text-[#F3EEE7] bg-[#8C735B] rounded-xl shadow-md hover:bg-[#7A6A58] transition-all duration-200 disabled:opacity-50"
+                  disabled={loading || imageUploading}
+                  className="px-8 py-3 text-sm font-semibold text-[#F3EEE7] bg-[#8C735B] rounded-xl shadow-md hover:bg-[#7A6A58] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? "Agregando..." : "Agregar libro"}
+                  {imageUploading ? "Subiendo imagen..." : loading ? "Agregando..." : "Agregar libro"}
                 </button>
               </div>
             </form>
@@ -325,7 +476,6 @@ const BookAdminTable = ({ books }: BookTableProps) => {
                 <tbody className="bg-gradient-to-br from-[#fffaf0] to-[#F3EEE7] divide-y divide-[#EADBC8]">
                   {bookList.map((book) => (
                     <tr key={book.id} className="hover:bg-[#F3EEE7] transition-colors duration-200">
-                      {/* Título */}
                       <td className="py-4 px-6 text-sm text-[#4B3C2A]">
                         <div className="flex items-center gap-3">
                           {book.coverImageUrl && (
@@ -343,25 +493,17 @@ const BookAdminTable = ({ books }: BookTableProps) => {
                           </div>
                         </div>
                       </td>
-                      
-                      {/* Autor */}
                       <td className="py-4 px-6 text-sm text-[#4B3C2A] font-medium">
                         {book.author}
                       </td>
-                      
-                      {/* Género */}
                       <td className="py-4 px-6 text-sm">
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#EADBC8] text-[#4B3C2A]">
                           {book.genre}
                         </span>
                       </td>
-                      
-                      {/* Año */}
                       <td className="py-4 px-6 text-sm text-[#4B3C2A]">
                         {book.publicationYear}
                       </td>
-                      
-                      {/* Disponibles */}
                       <td className="py-4 px-6 text-sm">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
                           book.availableCopies > 0 
@@ -371,8 +513,6 @@ const BookAdminTable = ({ books }: BookTableProps) => {
                           {book.availableCopies} {book.availableCopies === 1 ? 'copia' : 'copias'}
                         </span>
                       </td>
-                      
-                      {/* Acciones */}
                       <td className="py-4 px-6 text-sm">
                         <div className="flex items-center gap-2">
                           <Link
