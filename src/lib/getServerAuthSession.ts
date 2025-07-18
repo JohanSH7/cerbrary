@@ -13,6 +13,6 @@ export const getServerAuthSession = async (ctx: GetServerSidePropsContext) => {
       role: token.role as "USER" | "ADMIN",
       status: token.status as "APPROVED" | "PENDING" | "REJECTED",
     },
-    expires: token.exp as unknown as string, // o puedes devolver null si no necesitas expires
+    expires: token.exp as unknown as string,
   };
 };

@@ -17,10 +17,13 @@ const handler = NextAuth({
         if (!credentials?.email || !credentials.password) return null;
 
         const user = await db.user.findUnique({ where: { email: credentials.email } });
-        if (!user || !user.password) return null;
+        if (!user || !user.password) throw new Error("INVALID");
 
         const isValid = await compare(credentials.password, user.password);
-        if (!isValid || user.status !== "APPROVED") return null;
+        if (!isValid) throw new Error("INVALID");
+
+        if (user.status === "PENDING") throw new Error("PENDING");
+        if (user.status === "REJECTED") throw new Error("REJECTED");
 
         return {
           id: user.id,
@@ -28,7 +31,7 @@ const handler = NextAuth({
           role: user.role,
           status: user.status,
         };
-      },
+      }
     }),
   ],
   callbacks: {

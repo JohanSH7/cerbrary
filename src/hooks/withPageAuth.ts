@@ -22,7 +22,6 @@ export function withPageAuth<T extends { [key: string]: unknown }>(
   return async (ctx) => {
     const session = await getServerAuthSession(ctx) as Session | null;
 
-    // 👇 TypeScript ya reconoce que session?.user tiene role y status
     if (!session || session.user.status !== "APPROVED") {
       return {
         redirect: {

@@ -1,82 +1,75 @@
-import { useForm } from "react-hook-form";
-import { signIn } from "next-auth/react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { useState } from "react";
-import { useRouter } from "next/router";
+"use client";
 
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LoginForm } from "@/components/organism/loginForm";
+import { RegisterForm } from "@/components/organism/registerForm";
+import { motion, AnimatePresence } from "framer-motion";
 import { useWaitForSession } from "@/hooks/useWaitForSession";
 
-const formSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(4),
-});
-
-type FormValues = z.infer<typeof formSchema>;
-
-export default function LoginPage() {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-  });
-
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+export default function HomePage() {
+  const [tab, setTab] = useState("login");
 
   useWaitForSession(() => {
-    router.push("/dashboard");
+    window.location.href = "/dashboard";
   });
 
-  const onSubmit = async (data: FormValues) => {
-    const res = await signIn("credentials", {
-      ...data,
-      redirect: false,
-    });
-
-    if (!res?.ok) {
-      setError("Credenciales inválidas o cuenta no aprobada.");
-    }
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted p-6">
-      <Card className="max-w-md w-full">
-        <CardHeader>
-          <CardTitle className="text-xl">Iniciar sesión</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <Label htmlFor="email">Correo</Label>
-              <Input id="email" type="email" {...register("email")} />
-              {errors.email && (
-                <p className="text-sm text-red-500">{errors.email.message}</p>
-              )}
-            </div>
+    <div className="min-h-screen flex items-center justify-center bg-[#fffaf0] text-gray-800">
+      <div className="flex w-full max-w-6xl mx-auto rounded-lg overflow-hidden">
+        {/* Branding */}
+        <div className="hidden md:flex flex-col justify-center items-start p-12 w-1/2 bg-transparent">
+          <div className="space-y-4">
+            <h1 className="text-5xl font-extrabold text-gray-900">CerBrary</h1>
+            <p className="text-gray-700 text-lg max-w-md leading-relaxed">
+              Bienvenido a <strong>CerBrary</strong>, el sistema inteligente de gestión de bibliotecas inspirado en <em>Cerbero</em>, el guardián del conocimiento. Administra libros, usuarios y préstamos de forma segura, eficiente y moderna.
+            </p>
+          </div>
+        </div>
 
-            <div>
-              <Label htmlFor="password">Contraseña</Label>
-              <Input id="password" type="password" {...register("password")} />
-              {errors.password && (
-                <p className="text-sm text-red-500">{errors.password.message}</p>
-              )}
-            </div>
+        {/* Login / Registro con Tabs */}
+        <div className="w-full md:w-1/2 px-8 py-10">
+          <Card className="w-full shadow-md">
+            <CardContent>
+              <Tabs value={tab} onValueChange={setTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
+                  <TabsTrigger value="register">Registrarse</TabsTrigger>
+                </TabsList>
 
-            {error && <p className="text-sm text-red-500">{error}</p>}
-
-            <Button type="submit" className="w-full">
-              Ingresar
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+                <AnimatePresence mode="wait">
+                  {tab === "login" ? (
+                    <TabsContent value="login" forceMount>
+                      <motion.div
+                        key="login"
+                        initial={{ opacity: 0, x: 30 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -30 }}
+                        transition={{ duration: 0.4 }}
+                      >
+                        <LoginForm />
+                      </motion.div>
+                    </TabsContent>
+                  ) : (
+                    <TabsContent value="register" forceMount>
+                      <motion.div
+                        key="register"
+                        initial={{ opacity: 0, x: 30 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -30 }}
+                        transition={{ duration: 0.4 }}
+                      >
+                        <RegisterForm onSuccess={() => setTab("login")} />
+                      </motion.div>
+                    </TabsContent>
+                  )}
+                </AnimatePresence>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
