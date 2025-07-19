@@ -176,12 +176,13 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
       <CardHeader className="pb-4 flex-shrink-0">
         <div className="flex justify-center mb-4">
           <div className="relative overflow-hidden rounded-xl shadow-md ring-1 ring-[#EADBC8] group-hover:shadow-lg group-hover:ring-[#D5C2A5] transition-all duration-300">
-            <Image
-              src={book.coverImageUrl || "/placeholder.svg?height=200&width=150"}
+            <img
+              src={book.coverImageUrl || "https://via.placeholder.com/150x200/F3EEE7/8C735B?text=Sin+Imagen"}
               alt={book.title}
-              width={150}
-              height={200}
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              className="w-[150px] h-[200px] object-cover transition-transform duration-300 group-hover:scale-105"
+              onError={(e) => {
+                e.currentTarget.src = "https://via.placeholder.com/150x200/F3EEE7/8C735B?text=Sin+Imagen"
+              }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#4B3C2A]/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </div>
@@ -383,12 +384,13 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
                 <div className="md:col-span-1">
                   <div className="sticky top-0">
-                    <Image
-                      src={selectedBook.coverImageUrl || "/placeholder.svg?height=400&width=300"}
+                    <img
+                      src={selectedBook.coverImageUrl || "https://via.placeholder.com/300x400/F3EEE7/8C735B?text=Sin+Imagen"}
                       alt={selectedBook.title}
-                      width={300}
-                      height={400}
                       className="w-full h-auto rounded-xl shadow-lg ring-1 ring-[#EADBC8]"
+                      onError={(e) => {
+                        e.currentTarget.src = "https://via.placeholder.com/300x400/F3EEE7/8C735B?text=Sin+Imagen"
+                      }}
                     />
                   </div>
                 </div>

@@ -95,7 +95,8 @@ const BookAdminTable = ({ books }: BookTableProps) => {
     })
 
     if (!response.ok) {
-      throw new Error('Error al subir la imagen')
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Error al subir la imagen')
     }
 
     const data = await response.json()
@@ -128,7 +129,14 @@ const BookAdminTable = ({ books }: BookTableProps) => {
 
       // Si hay un archivo seleccionado, subirlo primero
       if (selectedFile) {
-        finalCoverImageUrl = await uploadImage(selectedFile)
+        try {
+          finalCoverImageUrl = await uploadImage(selectedFile)
+        } catch (uploadError) {
+          setError(`Error al subir imagen: ${uploadError instanceof Error ? uploadError.message : 'Error desconocido'}`)
+          setImageUploading(false)
+          setLoading(false)
+          return
+        }
       }
 
       const newBook = await createBook({
