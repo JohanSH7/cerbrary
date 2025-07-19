@@ -8,17 +8,39 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { LayoutDashboard, Users, BookOpen, ArrowLeftRight, User } from "lucide-react"
+import { getUserById } from "@/utils/api"; // Importa el método para obtener el usuario por ID
+
 
 export const Sidebar = () => {
   const { data: session } = useSession()
   const [isClient, setIsClient] = useState(false)
-  const role = session?.user.role
-
-  const userData = {
-    name: "Juan Pérez",
-    email: "juan.perez@example.com",
+  const role = session?.user?.role
+  const [userData, setUserData] = useState({
+    name: "Usuario Anónimo",
+    email: "Sin correo electrónico",
     avatar: "/placeholder.svg?height=40&width=40",
-  }
+  });
+
+  useEffect(() => {
+    setIsClient(true);
+
+    const fetchUserData = async () => {
+      if (!session?.user?.id) return;
+
+      try {
+        const user = await getUserById(session.user.id); // Llama al backend para obtener los datos del usuario
+        setUserData({
+          name: user.name || "Usuario Anónimo",
+          email: user.email || "Sin correo electrónico",
+          avatar: user.image || "/placeholder.svg?height=40&width=40",
+        });
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    };
+
+    fetchUserData();
+  }, [session]);
 
   useEffect(() => {
     setIsClient(true)
