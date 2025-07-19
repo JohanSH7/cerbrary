@@ -8,8 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { LayoutDashboard, Users, BookOpen, ArrowLeftRight, User } from "lucide-react"
-import { getUserById } from "@/utils/api"; // Importa el método para obtener el usuario por ID
-
+import { getUserById } from "@/utils/api"
 
 export const Sidebar = () => {
   const { data: session } = useSession()
@@ -19,32 +18,28 @@ export const Sidebar = () => {
     name: "Usuario Anónimo",
     email: "Sin correo electrónico",
     avatar: "/placeholder.svg?height=40&width=40",
-  });
+  })
 
   useEffect(() => {
-    setIsClient(true);
+    setIsClient(true)
 
     const fetchUserData = async () => {
-      if (!session?.user?.id) return;
+      if (!session?.user?.id) return
 
       try {
-        const user = await getUserById(session.user.id); // Llama al backend para obtener los datos del usuario
+        const user = await getUserById(session.user.id)
         setUserData({
           name: user.name || "Usuario Anónimo",
           email: user.email || "Sin correo electrónico",
           avatar: user.image || "/placeholder.svg?height=40&width=40",
-        });
+        })
       } catch (error) {
-        console.error("Error fetching user data:", error);
+        console.error("Error fetching user data:", error)
       }
-    };
+    }
 
-    fetchUserData();
-  }, [session]);
-
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
+    fetchUserData()
+  }, [session])
 
   const navigationItems = [
     {
@@ -84,10 +79,13 @@ export const Sidebar = () => {
     },
   ]
 
-  const filteredNavigation = navigationItems.filter((item) => item.allowedRoles.includes(role as string))
+  const filteredNavigation = navigationItems.filter((item) =>
+    item.allowedRoles.includes(role as string)
+  )
 
   return (
-    <aside className="bg-gradient-to-br from-[#fffaf0] to-[#F3EEE7] backdrop-blur-sm border-r border-[#EADBC8] w-80 min-h-screen flex flex-col shadow-sm">
+    <aside className="bg-gradient-to-br from-[#fffaf0] to-[#F3EEE7] backdrop-blur-sm border-r border-[#EADBC8] w-80 h-screen flex flex-col shadow-sm">
+      {/* Parte superior: Información del usuario */}
       <div className="p-6 bg-gradient-to-r from-[#D5C2A5] to-[#EADBC8] border-b border-[#d4c0a2]">
         <div className="flex items-center space-x-4">
           <Avatar className="h-14 w-14 ring-2 ring-[#B89F84] shadow-sm">
@@ -100,7 +98,7 @@ export const Sidebar = () => {
             <p className="text-lg font-semibold text-[#4B3C2A]">{userData.name}</p>
             <p className="text-sm text-[#7A6A58]">{userData.email}</p>
             {isClient && (
-              <Badge 
+              <Badge
                 className={`mt-2 text-xs font-medium px-3 py-1 rounded-full ${
                   role === "ADMIN"
                     ? "bg-[#8C735B] text-white"
@@ -114,7 +112,8 @@ export const Sidebar = () => {
         </div>
       </div>
 
-      <nav className="flex-1 p-6 space-y-3">
+      {/* Parte media: navegación con scroll si es necesario */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-3">
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-[#7A6A58] uppercase tracking-wide px-3 py-2">
             Navegación Principal
@@ -157,8 +156,9 @@ export const Sidebar = () => {
             </div>
           </>
         )}
-      </nav>
+      </div>
 
+      {/* Parte inferior: botón cerrar sesión fijo */}
       <div className="p-6 border-t border-[#EADBC8] bg-[#fdf9f4]">
         <LogoutButton />
       </div>

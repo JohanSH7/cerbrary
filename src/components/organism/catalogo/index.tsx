@@ -53,6 +53,10 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
   const [showDetails, setShowDetails] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
 
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [showErrorDialog, setShowErrorDialog] = useState(false)
+  const [loanMessage, setLoanMessage] = useState("")
+
   // Cargar libros iniciales
   useEffect(() => {
     if (initialBooks.length === 0) {
@@ -120,7 +124,8 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
 
   const handleLoanBook = async (bookId: string) => {
     if (!session) {
-      window.alert("Debes iniciar sesión para pedir un préstamo")
+      setLoanMessage("Debes iniciar sesión para pedir un préstamo")
+      setShowErrorDialog(true)
       return
     }
 
@@ -147,7 +152,8 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
         )
       }
 
-      window.alert("Préstamo solicitado exitosamente. El libro ha sido reservado para ti.")
+      setLoanMessage("Se encontraron copias del libro disponibles, Préstamo obtenido exitosamente.")
+      setShowSuccessDialog(true)
     } catch (error: unknown) {
       console.error("Error creating loan:", error)
       let errorMessage = "Error al procesar el préstamo"
@@ -158,7 +164,8 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
         errorMessage = error
       }
 
-      window.alert(errorMessage)
+      setLoanMessage(errorMessage)
+      setShowErrorDialog(true)
     } finally {
       setLoanLoading(false)
     }
@@ -361,7 +368,7 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
         )}
       </div>
 
-      {/* Modal de detalles */}
+     {/* Modal de detalles */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto border border-[#EADBC8] bg-gradient-to-br from-[#fffaf0] to-[#F3EEE7] rounded-2xl shadow-2xl">
           {selectedBook && (
@@ -392,30 +399,31 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
                     <p className="text-xl text-[#7A6A58] font-semibold mb-4">por {selectedBook.author}</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
+                  <div className="flex flex-wrap gap-6">
+                    <div className="space-y-2 flex-shrink-0">
                       <span className="text-sm font-semibold text-[#7A6A58] uppercase tracking-wide">Género</span>
-                      <Badge className="bg-[#D5C2A5] text-[#4B3C2A] font-bold px-4 py-2 rounded-full text-sm">
-                        {selectedBook.genre}
-                      </Badge>
+                      <div>
+                        <Badge className="bg-[#D5C2A5] text-[#4B3C2A] font-bold px-4 py-2 rounded-full text-sm whitespace-nowrap">
+                          {selectedBook.genre}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 flex-shrink-0">
                       <span className="text-sm font-semibold text-[#7A6A58] uppercase tracking-wide">Año de publicación</span>
                       <p className="text-[#4B3C2A] font-bold text-lg">{selectedBook.publicationYear}</p>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 flex-shrink-0">
                       <span className="text-sm font-semibold text-[#7A6A58] uppercase tracking-wide">ISBN</span>
                       <p className="text-[#4B3C2A] font-bold text-lg">{selectedBook.isbn || "No disponible"}</p>
                     </div>
-                    <div className="space-y-2">
-                      <span className="text-sm font-semibold text-[#7A6A58] uppercase tracking-wide">Copias disponibles</span>
+                    <div className="space-y-2 flex-shrink-0">
+                     
                       <Badge
-                        className={`font-bold px-4 py-2 rounded-full text-sm ${selectedBook.availableCopies > 0 
+                        className={`font-bold px-4 py-2 rounded-full text-sm whitespace-nowrap ${selectedBook.availableCopies > 0 
                           ? "bg-[#B89F84] text-white" 
                           : "bg-[#8C735B] text-[#F3EEE7]"
                         }`}
-                      >
-                        {selectedBook.availableCopies} disponibles
+                      >Copias disponibles: {selectedBook.availableCopies} 
                       </Badge>
                     </div>
                   </div>
@@ -450,6 +458,42 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Éxito */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="max-w-md border border-[#D5C2A5] bg-[#fffaf0] rounded-2xl shadow-2xl text-center">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-[#4B3C2A]">¡Éxito!</DialogTitle>
+            <DialogDescription className="text-[#7A6A58] font-medium">{loanMessage}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => setShowSuccessDialog(false)}
+              className="bg-[#8C735B] hover:bg-[#7A6A58] text-[#F3EEE7] font-semibold px-6 py-2 rounded-xl"
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Error */}
+      <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
+        <DialogContent className="max-w-md border border-red-200 bg-red-50 rounded-2xl shadow-2xl text-center">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-red-700">Ocurrió un error</DialogTitle>
+            <DialogDescription className="text-red-800 font-medium">{loanMessage}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => setShowErrorDialog(false)}
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-xl"
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
