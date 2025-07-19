@@ -18,7 +18,6 @@ const registerSchema = z.object({
   role: z.enum(["USER", "ADMIN"], {
     message: "Selecciona un rol",
   }),
-  image: z.string().optional(),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -32,22 +31,34 @@ export const RegisterForm = ({ switchToLogin }: Props) => {
     register,
     handleSubmit,
     formState: { errors },
-    setValue,
+    getValues,
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
   });
 
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const router = useRouter();
 
-  const onSubmit = async (data: RegisterFormValues) => {
+  const onSubmit = async () => {
     setLoading(true);
+    const values = getValues();
+
+    const formData = new FormData();
+    formData.append("name", values.name);
+    formData.append("email", values.email);
+    formData.append("password", values.password);
+    formData.append("role", values.role);
+    if (imageFile) {
+      formData.append("image", imageFile);
+    }
+
     const res = await fetch("/api/register", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: formData,
     });
+
     setLoading(false);
 
     if (res.ok) {
@@ -63,39 +74,38 @@ export const RegisterForm = ({ switchToLogin }: Props) => {
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      const result = reader.result as string;
-      setImagePreview(result);
-      setValue("image", result);
+      setImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
+
+    setImageFile(file); // Guarda el archivo para el FormData
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       <ProfileImageUpload imagePreview={imagePreview} onImageChange={handleImageUpload} />
-      <input type="hidden" {...register("image" as const)} />
 
       <div>
         <Label htmlFor="name">Nombre</Label>
-        <Input id="name" placeholder="Juan Pérez" {...register("name" as const)} />
+        <Input id="name" placeholder="Juan Pérez" {...register("name")} />
         <FormErrorMessage message={errors.name?.message} />
       </div>
 
       <div>
         <Label htmlFor="email">Correo</Label>
-        <Input id="email" placeholder="correo@ejemplo.com" {...register("email" as const)} />
+        <Input id="email" placeholder="correo@ejemplo.com" {...register("email")} />
         <FormErrorMessage message={errors.email?.message} />
       </div>
 
       <div>
         <Label htmlFor="password">Contraseña</Label>
-        <Input id="password" type="password" placeholder="••••••" {...register("password" as const)} />
+        <Input id="password" type="password" placeholder="••••••" {...register("password")} />
         <FormErrorMessage message={errors.password?.message} />
       </div>
 
       <div>
         <Label htmlFor="role">Rol</Label>
-        <select id="role" {...register("role" as const)} className="border rounded-md px-3 py-2 w-full">
+        <select id="role" {...register("role")} className="border rounded-md px-3 py-2 w-full">
           <option value="">Seleccione una opción</option>
           <option value="USER">Usuario</option>
           <option value="ADMIN">Administrador</option>

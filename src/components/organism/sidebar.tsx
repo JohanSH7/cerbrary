@@ -1,45 +1,73 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { useSession } from "next-auth/react"
-import { LogoutButton } from "@/components/atoms/logOut"
-import { useEffect, useState } from "react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
-import { LayoutDashboard, Users, BookOpen, ArrowLeftRight, User } from "lucide-react"
-import { getUserById } from "@/utils/api"
+import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { LogoutButton } from "@/components/atoms/logOut";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import {
+  LayoutDashboard,
+  Users,
+  BookOpen,
+  ArrowLeftRight,
+  User,
+} from "lucide-react";
+import { getUserById } from "@/utils/api";
+import { supabase } from "@/lib/supabaseClient";
 
 export const Sidebar = () => {
-  const { data: session } = useSession()
-  const [isClient, setIsClient] = useState(false)
-  const role = session?.user?.role
+  const { data: session } = useSession();
+  const [isClient, setIsClient] = useState(false);
+  const role = session?.user?.role;
+
   const [userData, setUserData] = useState({
     name: "Usuario Anónimo",
     email: "Sin correo electrónico",
     avatar: "/placeholder.svg?height=40&width=40",
-  })
+  });
 
   useEffect(() => {
-    setIsClient(true)
+    setIsClient(true);
 
     const fetchUserData = async () => {
-      if (!session?.user?.id) return
+      if (!session?.user?.id) return;
 
       try {
-        const user = await getUserById(session.user.id)
+        const user = await getUserById(session.user.id);
+
+        let avatarUrl = "/placeholder.svg?height=40&width=40";
+
+        if (user.image) {
+          const filePath = user.image.trim().replace(/^\/+/, ""); // Asegúrate de que no tenga espacios
+
+          const { data, error } = await supabase.storage
+            .from("imagescerbrary")
+            .createSignedUrl(filePath, 60 * 60 * 24); // 24h
+
+          console.log("📸 Nombre archivo:", filePath);
+          console.log("🔗 Signed URL generada:", data?.signedUrl);
+
+          if (data?.signedUrl) {
+            avatarUrl = data.signedUrl;
+          } else if (error) {
+            console.error("❌ Error al generar signed URL:", error.message);
+          }
+        }
+
         setUserData({
           name: user.name || "Usuario Anónimo",
           email: user.email || "Sin correo electrónico",
-          avatar: user.image || "/placeholder.svg?height=40&width=40",
-        })
+          avatar: avatarUrl,
+        });
       } catch (error) {
-        console.error("Error fetching user data:", error)
+        console.error("❌ Error al obtener los datos del usuario:", error);
       }
-    }
+    };
 
-    fetchUserData()
-  }, [session])
+    fetchUserData();
+  }, [session]);
 
   const navigationItems = [
     {
@@ -56,7 +84,7 @@ export const Sidebar = () => {
       description: "Historial de movimientos",
       allowedRoles: ["ADMIN", "USER"],
     },
-  ]
+  ];
 
   const adminItems = [
     {
@@ -77,11 +105,11 @@ export const Sidebar = () => {
       label: "Todas las Transacciones",
       description: "Ver todas las transacciones del sistema",
     },
-  ]
+  ];
 
   const filteredNavigation = navigationItems.filter((item) =>
     item.allowedRoles.includes(role as string)
-  )
+  );
 
   return (
     <aside className="bg-gradient-to-br from-[#fffaf0] to-[#F3EEE7] backdrop-blur-sm border-r border-[#EADBC8] w-80 h-screen flex flex-col shadow-sm">
@@ -112,7 +140,7 @@ export const Sidebar = () => {
         </div>
       </div>
 
-      {/* Parte media: navegación con scroll si es necesario */}
+      {/* Navegación */}
       <div className="flex-1 overflow-y-auto p-6 space-y-3">
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-[#7A6A58] uppercase tracking-wide px-3 py-2">
@@ -158,10 +186,10 @@ export const Sidebar = () => {
         )}
       </div>
 
-      {/* Parte inferior: botón cerrar sesión fijo */}
+      {/* Cerrar sesión */}
       <div className="p-6 border-t border-[#EADBC8] bg-[#fdf9f4]">
         <LogoutButton />
       </div>
     </aside>
-  )
-}
+  );
+};
