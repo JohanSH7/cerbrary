@@ -2,6 +2,21 @@
 
 CerBrary es un sistema moderno de gestión de biblioteca desarrollado con Next.js, que permite administrar libros, usuarios y transacciones de préstamos de manera eficiente.
 
+## Usuarios prueba:
+
+admin@biblioteca.com<br>
+admin123<br>
+
+bibliotecario@biblioteca.com<br>
+bibliotecario123<br>
+
+usuario@biblioteca.com<br>
+user123<br>
+
+prueba@biblioteca.com<br>
+prueba123<br>
+
+
 ## 🚀 Características
 
 - **Gestión de Usuarios**: Sistema de autenticación con roles (Usuario/Administrador)
