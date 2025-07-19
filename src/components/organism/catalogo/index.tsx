@@ -1,8 +1,6 @@
 "use client"
-
 import type React from "react"
 import { useState, useEffect } from "react"
-import Image from "next/image"
 import { getBooks, searchBooks, createTransaction } from "@/utils/api"
 import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,6 +18,14 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Search, BookOpen, User, Calendar, Hash, Eye, Heart, AlertCircle } from "lucide-react"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 interface Book {
   id: string
@@ -51,11 +57,14 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
   const [searchAuthor, setSearchAuthor] = useState("")
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
   const [showDetails, setShowDetails] = useState(false)
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid") // This state is not used in the provided code, but kept for consistency.
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [showErrorDialog, setShowErrorDialog] = useState(false)
   const [loanMessage, setLoanMessage] = useState("")
+
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1)
+  const booksPerPage = 8
 
   // Cargar libros iniciales
   useEffect(() => {
@@ -70,6 +79,7 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
     try {
       const result = await getBooks()
       setBooks(result)
+      setCurrentPage(1) // Reset to first page on new load
     } catch (error) {
       console.error("Error loading books:", error)
       setError("Error al cargar los libros")
@@ -82,10 +92,8 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
-
     try {
       let result: Book[] = []
-
       if (searchTitle && searchAuthor) {
         const titleResults = await searchBooks(searchTitle)
         result = titleResults.filter((book: Book) => book.author.toLowerCase().includes(searchAuthor.toLowerCase()))
@@ -96,8 +104,8 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
       } else {
         result = await getBooks()
       }
-
       setBooks(result)
+      setCurrentPage(1) // Reset to first page on new search
     } catch (error) {
       console.error("Error searching books:", error)
       setError("Error al buscar libros")
@@ -128,42 +136,29 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
       setShowErrorDialog(true)
       return
     }
-
     setLoanLoading(true)
     setError(null)
-
     try {
       const userId = session.user.id
       const result = await createTransaction(bookId, userId)
-
       // Actualizar el libro en el estado local
       setBooks((prevBooks) =>
-        prevBooks.map((book) =>
-          book.id === bookId
-            ? { ...book, availableCopies: book.availableCopies - 1 }
-            : book
-        )
+        prevBooks.map((book) => (book.id === bookId ? { ...book, availableCopies: book.availableCopies - 1 } : book)),
       )
-
       // Actualizar el libro seleccionado si es el mismo
       if (selectedBook?.id === bookId) {
-        setSelectedBook((prev) =>
-          prev ? { ...prev, availableCopies: prev.availableCopies - 1 } : null
-        )
+        setSelectedBook((prev) => (prev ? { ...prev, availableCopies: prev.availableCopies - 1 } : null))
       }
-
       setLoanMessage("Se encontraron copias del libro disponibles, Préstamo obtenido exitosamente.")
       setShowSuccessDialog(true)
     } catch (error: unknown) {
       console.error("Error creating loan:", error)
       let errorMessage = "Error al procesar el préstamo"
-
       if (error instanceof Error) {
         errorMessage = error.message
       } else if (typeof error === "string") {
         errorMessage = error
       }
-
       setLoanMessage(errorMessage)
       setShowErrorDialog(true)
     } finally {
@@ -171,17 +166,27 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
     }
   }
 
+  // Get current books for pagination
+  const indexOfLastBook = currentPage * booksPerPage
+  const indexOfFirstBook = indexOfLastBook - booksPerPage
+  const currentBooks = books.slice(indexOfFirstBook, indexOfLastBook)
+
+  // Calculate total pages
+  const totalPages = Math.ceil(books.length / booksPerPage)
+
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber)
+
   const BookCard = ({ book }: { book: Book }) => (
     <Card className="group hover:shadow-lg transition-all duration-300 ease-out border border-[#EADBC8] bg-gradient-to-br from-[#fffaf0] to-[#F3EEE7] backdrop-blur-sm hover:scale-[1.02] hover:shadow-xl hover:border-[#D5C2A5] rounded-2xl overflow-hidden h-full flex flex-col">
       <CardHeader className="pb-4 flex-shrink-0">
         <div className="flex justify-center mb-4">
           <div className="relative overflow-hidden rounded-xl shadow-md ring-1 ring-[#EADBC8] group-hover:shadow-lg group-hover:ring-[#D5C2A5] transition-all duration-300">
             <img
-              src={book.coverImageUrl || "https://via.placeholder.com/150x200/F3EEE7/8C735B?text=Sin+Imagen"}
+              src={book.coverImageUrl || "/placeholder.svg?height=200&width=150&query=book+cover+placeholder"}
               alt={book.title}
               className="w-[150px] h-[200px] object-cover transition-transform duration-300 group-hover:scale-105"
               onError={(e) => {
-                e.currentTarget.src = "https://via.placeholder.com/150x200/F3EEE7/8C735B?text=Sin+Imagen"
+                e.currentTarget.src = "/placeholder.svg?height=200&width=150"
               }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#4B3C2A]/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -190,11 +195,8 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
         <CardTitle className="text-lg font-bold text-[#4B3C2A] line-clamp-2 group-hover:text-[#7A6A58] transition-colors duration-200 leading-tight min-h-[3.5rem]">
           {book.title}
         </CardTitle>
-        <CardDescription className="text-sm text-[#7A6A58] font-medium line-clamp-1">
-          {book.author}
-        </CardDescription>
+        <CardDescription className="text-sm text-[#7A6A58] font-medium line-clamp-1">{book.author}</CardDescription>
       </CardHeader>
-
       <CardContent className="space-y-3 flex-grow">
         <div className="flex items-center justify-between">
           <Badge className="bg-[#D5C2A5] text-[#4B3C2A] hover:bg-[#B89F84] font-semibold px-3 py-1 rounded-full border-0 text-xs">
@@ -205,12 +207,10 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
             {book.publicationYear}
           </div>
         </div>
-
         <div className="flex items-center justify-between">
           <Badge
-            className={`font-semibold px-3 py-1 rounded-full border-0 text-xs ${book.availableCopies > 0 
-              ? "bg-[#B89F84] text-white" 
-              : "bg-[#8C735B] text-[#F3EEE7]"
+            className={`font-semibold px-3 py-1 rounded-full border-0 text-xs ${
+              book.availableCopies > 0 ? "bg-[#B89F84] text-white" : "bg-[#8C735B] text-[#F3EEE7]"
             }`}
           >
             {book.availableCopies} disponibles
@@ -223,7 +223,6 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
           )}
         </div>
       </CardContent>
-
       <CardFooter className="flex flex-col gap-3 pt-4 flex-shrink-0">
         <Button
           variant="outline"
@@ -287,7 +286,8 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
             <div>
               <h1 className="text-3xl font-bold text-[#4B3C2A] mb-1">Catálogo de Libros</h1>
               <p className="text-base text-[#7A6A58] font-medium">
-                Descubre nuestra colección de <span className="text-[#4B3C2A] font-semibold">{books.length}</span> libros
+                Descubre nuestra colección de <span className="text-[#4B3C2A] font-semibold">{books.length}</span>{" "}
+                libros
               </p>
             </div>
           </div>
@@ -320,7 +320,6 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
                 />
               </div>
             </div>
-
             <div className="flex gap-4">
               <Button
                 type="submit"
@@ -353,8 +352,8 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
       {/* Grid de libros */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {loading ? (
-          Array.from({ length: 8 }).map((_, index) => <BookSkeleton key={index} />)
-        ) : books.length === 0 ? (
+          Array.from({ length: booksPerPage }).map((_, index) => <BookSkeleton key={index} />)
+        ) : currentBooks.length === 0 ? (
           <div className="col-span-full">
             <Card className="border border-[#EADBC8] bg-gradient-to-br from-[#fffaf0] to-[#F3EEE7] rounded-2xl shadow-lg">
               <CardContent className="flex flex-col items-center justify-center py-16">
@@ -365,11 +364,55 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
             </Card>
           </div>
         ) : (
-          books.map((book) => <BookCard key={book.id} book={book} />)
+          currentBooks.map((book) => <BookCard key={book.id} book={book} />)
         )}
       </div>
 
-     {/* Modal de detalles */}
+      {/* Paginación */}
+      {books.length > booksPerPage && (
+        <div className="flex justify-center mt-8">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    if (currentPage > 1) paginate(currentPage - 1)
+                  }}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    href="#"
+                    isActive={page === currentPage}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      paginate(page)
+                    }}
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    if (currentPage < totalPages) paginate(currentPage + 1)
+                  }}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
+
+      {/* Modal de detalles */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto border border-[#EADBC8] bg-gradient-to-br from-[#fffaf0] to-[#F3EEE7] rounded-2xl shadow-2xl">
           {selectedBook && (
@@ -380,27 +423,27 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
                   Información completa sobre el libro seleccionado
                 </DialogDescription>
               </DialogHeader>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
                 <div className="md:col-span-1">
                   <div className="sticky top-0">
                     <img
-                      src={selectedBook.coverImageUrl || "https://via.placeholder.com/300x400/F3EEE7/8C735B?text=Sin+Imagen"}
+                      src={
+                        selectedBook.coverImageUrl ||
+                        "/placeholder.svg?height=400&width=300&query=book+cover+placeholder"
+                      }
                       alt={selectedBook.title}
                       className="w-full h-auto rounded-xl shadow-lg ring-1 ring-[#EADBC8]"
                       onError={(e) => {
-                        e.currentTarget.src = "https://via.placeholder.com/300x400/F3EEE7/8C735B?text=Sin+Imagen"
+                        e.currentTarget.src = "/placeholder.svg?height=400&width=300"
                       }}
                     />
                   </div>
                 </div>
-
                 <div className="md:col-span-2 space-y-6">
                   <div>
                     <h3 className="text-3xl font-bold text-[#4B3C2A] mb-2 leading-tight">{selectedBook.title}</h3>
                     <p className="text-xl text-[#7A6A58] font-semibold mb-4">por {selectedBook.author}</p>
                   </div>
-
                   <div className="flex flex-wrap gap-6">
                     <div className="space-y-2 flex-shrink-0">
                       <span className="text-sm font-semibold text-[#7A6A58] uppercase tracking-wide">Género</span>
@@ -411,7 +454,9 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
                       </div>
                     </div>
                     <div className="space-y-2 flex-shrink-0">
-                      <span className="text-sm font-semibold text-[#7A6A58] uppercase tracking-wide">Año de publicación</span>
+                      <span className="text-sm font-semibold text-[#7A6A58] uppercase tracking-wide">
+                        Año de publicación
+                      </span>
                       <p className="text-[#4B3C2A] font-bold text-lg">{selectedBook.publicationYear}</p>
                     </div>
                     <div className="space-y-2 flex-shrink-0">
@@ -419,17 +464,15 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
                       <p className="text-[#4B3C2A] font-bold text-lg">{selectedBook.isbn || "No disponible"}</p>
                     </div>
                     <div className="space-y-2 flex-shrink-0">
-                     
                       <Badge
-                        className={`font-bold px-4 py-2 rounded-full text-sm whitespace-nowrap ${selectedBook.availableCopies > 0 
-                          ? "bg-[#B89F84] text-white" 
-                          : "bg-[#8C735B] text-[#F3EEE7]"
+                        className={`font-bold px-4 py-2 rounded-full text-sm whitespace-nowrap ${
+                          selectedBook.availableCopies > 0 ? "bg-[#B89F84] text-white" : "bg-[#8C735B] text-[#F3EEE7]"
                         }`}
-                      >Copias disponibles: {selectedBook.availableCopies} 
+                      >
+                        Copias disponibles: {selectedBook.availableCopies}
                       </Badge>
                     </div>
                   </div>
-
                   {selectedBook.description && (
                     <div className="space-y-3">
                       <span className="text-sm font-semibold text-[#7A6A58] uppercase tracking-wide">Descripción</span>
@@ -438,7 +481,6 @@ const ImprovedCatalog = ({ initialBooks = [] }: CatalogoProps) => {
                   )}
                 </div>
               </div>
-
               <DialogFooter className="flex gap-4 pt-6">
                 <Button
                   variant="outline"

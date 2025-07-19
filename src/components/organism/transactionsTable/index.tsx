@@ -1,8 +1,15 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import Row from "@/components/atoms/TransactionTableRow"
 import { updateTransaction } from "@/utils/api"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 interface Transaction {
   id: string
@@ -19,9 +26,12 @@ interface TransactionTableProps {
 
 const Index = ({ transactions }: TransactionTableProps) => {
   const [transactionList, setTransactionList] = useState(transactions)
+  const [currentPage, setCurrentPage] = useState(1)
+  const transactionsPerPage = 6 // Mostrar un máximo de 6 transacciones por página
 
   useEffect(() => {
     setTransactionList(transactions)
+    setCurrentPage(1) // Resetear a la primera página cuando las transacciones cambian
   }, [transactions])
 
   const handleUpdateStatus = async (id: string, newStatus: string, returnDate?: string) => {
@@ -33,6 +43,15 @@ const Index = ({ transactions }: TransactionTableProps) => {
     }
   }
 
+  // Lógica de paginación
+  const indexOfLastTransaction = currentPage * transactionsPerPage
+  const indexOfFirstTransaction = indexOfLastTransaction - transactionsPerPage
+  const currentTransactions = transactionList.slice(indexOfFirstTransaction, indexOfLastTransaction)
+
+  const totalPages = Math.ceil(transactionList.length / transactionsPerPage)
+
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber)
+
   return (
     <section className="container px-4 mx-auto">
       <div className="flex items-center gap-x-3">
@@ -41,6 +60,7 @@ const Index = ({ transactions }: TransactionTableProps) => {
           {transactionList.length} transacciones
         </span>
       </div>
+
       <div className="flex flex-col mt-6">
         <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
           <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
@@ -69,7 +89,7 @@ const Index = ({ transactions }: TransactionTableProps) => {
                   </tr>
                 </thead>
                 <tbody className="bg-[#fffaf0] divide-y divide-[#EADBC8]">
-                  {transactionList.map((transaction) => (
+                  {currentTransactions.map((transaction) => (
                     <Row key={transaction.id} transaction={transaction} onUpdateStatus={handleUpdateStatus} />
                   ))}
                 </tbody>
@@ -78,63 +98,50 @@ const Index = ({ transactions }: TransactionTableProps) => {
           </div>
         </div>
       </div>
-      <div className="flex items-center justify-between mt-6">
-        <a
-          href="#"
-          className="flex items-center px-5 py-2 text-sm text-[#4B3C2A] capitalize transition-colors duration-200 bg-[#F3EEE7] border border-[#EADBC8] rounded-md gap-x-2 hover:bg-[#EADBC8]"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth="1.5"
-            stroke="currentColor"
-            className="w-5 h-5 rtl:-scale-x-100"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 15.75L3 12m0 0l3.75-3.75M3 12h18" />
-          </svg>
-          <span>previous</span>
-        </a>
-        <div className="items-center hidden lg:flex gap-x-3">
-          <a href="#" className="px-2 py-1 text-sm text-[#F3EEE7] rounded-md bg-[#8C735B]">
-            1
-          </a>
-          <a href="#" className="px-2 py-1 text-sm text-[#7A6A58] rounded-md hover:bg-[#EADBC8]">
-            2
-          </a>
-          <a href="#" className="px-2 py-1 text-sm text-[#7A6A58] rounded-md hover:bg-[#EADBC8]">
-            3
-          </a>
-          <a href="#" className="px-2 py-1 text-sm text-[#7A6A58] rounded-md hover:bg-[#EADBC8]">
-            ...
-          </a>
-          <a href="#" className="px-2 py-1 text-sm text-[#7A6A58] rounded-md hover:bg-[#EADBC8]">
-            12
-          </a>
-          <a href="#" className="px-2 py-1 text-sm text-[#7A6A58] rounded-md hover:bg-[#EADBC8]">
-            13
-          </a>
-          <a href="#" className="px-2 py-1 text-sm text-[#7A6A58] rounded-md hover:bg-[#EADBC8]">
-            14
-          </a>
+
+      {/* Paginación */}
+      {transactionList.length > transactionsPerPage && (
+        <div className="flex items-center justify-between mt-6">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    if (currentPage > 1) paginate(currentPage - 1)
+                  }}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    href="#"
+                    isActive={page === currentPage}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      paginate(page)
+                    }}
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    if (currentPage < totalPages) paginate(currentPage + 1)
+                  }}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
-        <a
-          href="#"
-          className="flex items-center px-5 py-2 text-sm text-[#4B3C2A] capitalize transition-colors duration-200 bg-[#F3EEE7] border border-[#EADBC8] rounded-md gap-x-2 hover:bg-[#EADBC8]"
-        >
-          <span>Next</span>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth="1.5"
-            stroke="currentColor"
-            className="w-5 h-5 rtl:-scale-x-100"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
-          </svg>
-        </a>
-      </div>
+      )}
     </section>
   )
 }

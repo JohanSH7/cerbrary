@@ -1,10 +1,17 @@
 "use client"
-
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
-import { createBook } from "@/utils/api"
+import { createBook, deleteBook } from "@/utils/api" // Asegúrate de que esta función esté definida correctamente
 import { useSession } from "next-auth/react"
 import Link from "next/link"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 interface Book {
   id: string
@@ -48,8 +55,13 @@ const BookAdminTable = ({ books }: BookTableProps) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1)
+  const booksPerPage = 8// Mostrar un máximo de 10 libros por página
+
   useEffect(() => {
     setBookList(books)
+    setCurrentPage(1) // Resetear a la primera página cuando los libros cambian
   }, [books])
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -61,20 +73,17 @@ const BookAdminTable = ({ books }: BookTableProps) => {
     const file = e.target.files?.[0]
     if (file) {
       // Validar tipo de archivo
-      if (!file.type.startsWith('image/')) {
-        setError('Por favor selecciona un archivo de imagen válido.')
+      if (!file.type.startsWith("image/")) {
+        setError("Por favor selecciona un archivo de imagen válido.")
         return
       }
-
       // Validar tamaño (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        setError('La imagen debe ser menor a 5MB.')
+        setError("La imagen debe ser menor a 5MB.")
         return
       }
-
       setSelectedFile(file)
       setError(null)
-
       // Crear preview
       const reader = new FileReader()
       reader.onload = (e) => {
@@ -87,18 +96,16 @@ const BookAdminTable = ({ books }: BookTableProps) => {
   // Función para subir imagen
   const uploadImage = async (file: File): Promise<string> => {
     const formData = new FormData()
-    formData.append('file', file)
-    
-    const response = await fetch('/api/upload', {
-      method: 'POST',
+    formData.append("file", file)
+
+    const response = await fetch("/api/upload", {
+      method: "POST",
       body: formData,
     })
-
     if (!response.ok) {
       const errorData = await response.json()
-      throw new Error(errorData.error || 'Error al subir la imagen')
+      throw new Error(errorData.error || "Error al subir la imagen")
     }
-
     const data = await response.json()
     return data.url
   }
@@ -120,25 +127,23 @@ const BookAdminTable = ({ books }: BookTableProps) => {
       setError("Solo administradores pueden agregar libros.")
       return
     }
-    
+
     setLoading(true)
     setImageUploading(true)
-    
+
     try {
       let finalCoverImageUrl = form.coverImageUrl
-
       // Si hay un archivo seleccionado, subirlo primero
       if (selectedFile) {
         try {
           finalCoverImageUrl = await uploadImage(selectedFile)
         } catch (uploadError) {
-          setError(`Error al subir imagen: ${uploadError instanceof Error ? uploadError.message : 'Error desconocido'}`)
+          setError(`Error al subir imagen: ${uploadError instanceof Error ? uploadError.message : "Error desconocido"}`)
           setImageUploading(false)
           setLoading(false)
           return
         }
       }
-
       const newBook = await createBook({
         createdById: session.user.id,
         title: form.title,
@@ -151,7 +156,7 @@ const BookAdminTable = ({ books }: BookTableProps) => {
         description: form.description,
         coverImageUrl: finalCoverImageUrl,
       })
-      
+
       setBookList((prev) => [...prev, newBook])
       setForm({
         title: "",
@@ -164,8 +169,9 @@ const BookAdminTable = ({ books }: BookTableProps) => {
         coverImageUrl: "",
       })
       clearImageSelection()
+      setCurrentPage(1) // Reset to first page after adding a new book
     } catch (err: unknown) {
-      console.error('Error al agregar libro:', err)
+      console.error("Error al agregar libro:", err)
       setError("Error al agregar el libro")
     } finally {
       setLoading(false)
@@ -177,22 +183,25 @@ const BookAdminTable = ({ books }: BookTableProps) => {
     setError(null)
     setLoading(true)
     try {
-      const res = await fetch("/api/book", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookId: id }),
-      })
-      if (res.ok) {
-        setBookList((prev) => prev.filter((b) => b.id !== id))
-      } else {
-        setError("No se pudo eliminar el libro")
-      }
+      await deleteBook(id) // Usando la función deleteBook de @/utils/api
+      setBookList((prev) => prev.filter((b) => b.id !== id))
+      setCurrentPage(1) // Reset to first page after deleting a book
     } catch (err: unknown) {
-      setError("Error de conexión")
+      setError("Error de conexión o al eliminar el libro")
+      console.error("Error deleting book:", err)
     } finally {
       setLoading(false)
     }
   }
+
+  // Lógica de paginación
+  const indexOfLastBook = currentPage * booksPerPage
+  const indexOfFirstBook = indexOfLastBook - booksPerPage
+  const currentBooks = bookList.slice(indexOfFirstBook, indexOfLastBook)
+
+  const totalPages = Math.ceil(bookList.length / booksPerPage)
+
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber)
 
   return (
     <div className="min-h-screen bg-white">
@@ -309,7 +318,6 @@ const BookAdminTable = ({ books }: BookTableProps) => {
               {/* Sección de imagen */}
               <div className="border border-[#EADBC8] rounded-xl p-6 bg-gradient-to-br from-[#F3EEE7] to-[#EADBC8]">
                 <h4 className="text-lg font-semibold text-[#4B3C2A] mb-4">Portada del libro</h4>
-                
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Opción 1: Subir archivo */}
                   <div>
@@ -322,12 +330,9 @@ const BookAdminTable = ({ books }: BookTableProps) => {
                         onChange={handleFileSelect}
                         className="w-full px-4 py-3 bg-[#F3EEE7] border border-[#EADBC8] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B89F84] focus:border-[#B89F84] text-[#4B3C2A] file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#B89F84] file:text-[#F3EEE7] hover:file:bg-[#8C735B]"
                       />
-                      <p className="text-xs text-[#7A6A58]">
-                        Formatos soportados: JPG, PNG, GIF. Tamaño máximo: 5MB
-                      </p>
+                      <p className="text-xs text-[#7A6A58]">Formatos soportados: JPG, PNG, GIF. Tamaño máximo: 5MB</p>
                     </div>
                   </div>
-
                   {/* Opción 2: URL de imagen */}
                   <div>
                     <label className="block text-sm font-semibold text-[#4B3C2A] mb-2">O URL de imagen</label>
@@ -346,7 +351,6 @@ const BookAdminTable = ({ books }: BookTableProps) => {
                     )}
                   </div>
                 </div>
-
                 {/* Preview de imagen */}
                 {(imagePreview || form.coverImageUrl) && (
                   <div className="mt-6">
@@ -358,7 +362,7 @@ const BookAdminTable = ({ books }: BookTableProps) => {
                           alt="Preview"
                           className="w-32 h-40 object-cover rounded-lg shadow-md border border-[#EADBC8]"
                           onError={(e) => {
-                            e.currentTarget.style.display = 'none'
+                            e.currentTarget.style.display = "none"
                           }}
                         />
                         <button
@@ -371,7 +375,7 @@ const BookAdminTable = ({ books }: BookTableProps) => {
                       </div>
                       <div className="flex-1">
                         <p className="text-sm text-[#4B3C2A] font-medium mb-1">
-                          {selectedFile ? selectedFile.name : 'Imagen desde URL'}
+                          {selectedFile ? selectedFile.name : "Imagen desde URL"}
                         </p>
                         {selectedFile && (
                           <p className="text-xs text-[#7A6A58]">
@@ -482,65 +486,64 @@ const BookAdminTable = ({ books }: BookTableProps) => {
                   </tr>
                 </thead>
                 <tbody className="bg-gradient-to-br from-[#fffaf0] to-[#F3EEE7] divide-y divide-[#EADBC8]">
-                  {bookList.map((book) => (
+                  {currentBooks.map((book) => (
                     <tr key={book.id} className="hover:bg-[#F3EEE7] transition-colors duration-200">
                       <td className="py-4 px-6 text-sm text-[#4B3C2A]">
                         <div className="flex items-center gap-3">
                           {book.coverImageUrl && (
                             <img
-                              src={book.coverImageUrl}
+                              src={book.coverImageUrl || "/placeholder.svg?height=48&width=40&query=book+cover"}
                               alt={book.title}
                               className="w-10 h-12 object-cover rounded-lg shadow-sm"
+                              onError={(e) => {
+                                e.currentTarget.src = "/placeholder.svg?height=48&width=40"
+                              }}
                             />
                           )}
                           <div>
                             <p className="font-semibold text-[#4B3C2A] line-clamp-2">{book.title}</p>
-                            {book.isbn && (
-                              <p className="text-xs text-[#7A6A58] mt-1">ISBN: {book.isbn}</p>
-                            )}
+                            {book.isbn && <p className="text-xs text-[#7A6A58] mt-1">ISBN: {book.isbn}</p>}
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-6 text-sm text-[#4B3C2A] font-medium">
-                        {book.author}
-                      </td>
+                      <td className="py-4 px-6 text-sm text-[#4B3C2A] font-medium">{book.author}</td>
                       <td className="py-4 px-6 text-sm">
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#EADBC8] text-[#4B3C2A]">
                           {book.genre}
                         </span>
                       </td>
-                      <td className="py-4 px-6 text-sm text-[#4B3C2A]">
-                        {book.publicationYear}
-                      </td>
+                      <td className="py-4 px-6 text-sm text-[#4B3C2A]">{book.publicationYear}</td>
                       <td className="py-4 px-6 text-sm">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                          book.availableCopies > 0 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {book.availableCopies} {book.availableCopies === 1 ? 'copia' : 'copias'}
+                        <span
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                            book.availableCopies > 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {book.availableCopies} {book.availableCopies === 1 ? "copia" : "copias"}
                         </span>
                       </td>
                       <td className="py-4 px-6 text-sm">
                         <div className="flex items-center gap-2">
-                          <Link
-                            href={`/admin/books/${book.id}`}
-                            className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium bg-[#B89F84] text-[#F3EEE7] hover:bg-[#8C735B] transition-colors duration-200"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4 mr-1">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                            </svg>
-                            Editar
-                          </Link>
-                          
+                         
                           {session?.user?.role === "ADMIN" && (
                             <button
                               onClick={() => handleDelete(book.id)}
                               disabled={loading}
                               className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors duration-200 disabled:opacity-50"
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4 mr-1">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth="1.5"
+                                stroke="currentColor"
+                                className="w-4 h-4 mr-1"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                />
                               </svg>
                               Eliminar
                             </button>
@@ -554,6 +557,50 @@ const BookAdminTable = ({ books }: BookTableProps) => {
             </div>
           </div>
         </div>
+
+        {/* Paginación */}
+        {bookList.length > booksPerPage && (
+          <div className="flex items-center justify-between mt-6">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      if (currentPage > 1) paginate(currentPage - 1)
+                    }}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <PaginationItem key={page}>
+                    <PaginationLink
+                      href="#"
+                      isActive={page === currentPage}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        paginate(page)
+                      }}
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      if (currentPage < totalPages) paginate(currentPage + 1)
+                    }}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </section>
     </div>
   )
