@@ -1,7 +1,7 @@
-"use client"
-
 import type React from "react"
 import { useEffect, useState } from "react"
+import { GetServerSideProps } from "next"
+import { withPageAuth } from "@/hooks/withPageAuth"
 import { getBooks, searchBooks, filterBooksByAuthor, filterBooksByYear } from "@/utils/api"
 import BookDataTable from "@/components/organism/BooksTable/index"
 import { DashboardLayout } from "@/components/templates/dashboardLayout"
@@ -274,5 +274,14 @@ const BookIndex = () => {
     </DashboardLayout>
   )
 }
+
+export const getServerSideProps: GetServerSideProps = withPageAuth(
+  async () => {
+    return {
+      props: {},
+    }
+  },
+  { allowedRoles: ["ADMIN"] }
+)
 
 export default BookIndex

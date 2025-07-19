@@ -1,6 +1,6 @@
-"use client"
-
 import { useEffect, useState } from "react"
+import { GetServerSideProps } from "next"
+import { withPageAuth } from "@/hooks/withPageAuth"
 import { getUsers } from "@/utils/api"
 import UserDataTable from "@/components/organism/DataTable/index"
 import { DashboardLayout } from "@/components/templates/dashboardLayout"
@@ -24,5 +24,14 @@ const Index = () => {
     </DashboardLayout>
   )
 }
+
+export const getServerSideProps: GetServerSideProps = withPageAuth(
+  async () => {
+    return {
+      props: {},
+    }
+  },
+  { allowedRoles: ["ADMIN"] }
+)
 
 export default Index

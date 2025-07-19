@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { GetServerSideProps } from 'next';
+import { withPageAuth } from '@/hooks/withPageAuth';
 import { getUserTransactions } from '@/utils/api';
 import TransactionDataTable from '@/components/organism/transactionsTable';
 import { useSession } from 'next-auth/react';
@@ -23,5 +25,14 @@ const TransactionsPage = () => {
         </DashboardLayout>
     );
 };
+
+export const getServerSideProps: GetServerSideProps = withPageAuth(
+    async () => {
+        return {
+            props: {},
+        };
+    },
+    { allowedRoles: ["USER", "ADMIN"] }
+);
 
 export default TransactionsPage;

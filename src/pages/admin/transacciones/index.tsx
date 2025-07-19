@@ -1,6 +1,6 @@
-"use client"
-
 import { useEffect, useState } from "react"
+import { GetServerSideProps } from "next"
+import { withPageAuth } from "@/hooks/withPageAuth"
 import { getUserTransactions } from "@/utils/api"
 import TransactionDataTable from "@/components/organism/transactionsTable/index"
 import { DashboardLayout } from "@/components/templates/dashboardLayout"
@@ -111,5 +111,14 @@ const TransactionIndex = () => {
     </DashboardLayout>
   )
 }
+
+export const getServerSideProps: GetServerSideProps = withPageAuth(
+  async () => {
+    return {
+      props: {},
+    }
+  },
+  { allowedRoles: ["ADMIN"] }
+)
 
 export default TransactionIndex
