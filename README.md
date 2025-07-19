@@ -267,3 +267,8 @@ Si tienes alguna pregunta o problema, puedes:
 ---
 
 ⭐ ¡No olvides darle una estrella al proyecto si te fue útil!
+
+
+Juan Diego Calderon Bermeo<br>
+Juan David Vasquez Ospina<br>
+Johan Sebastian Henao Cañas<br>
